@@ -103,6 +103,35 @@ enum PixelArtRenderer {
                 height: pixelSize
             )
         }
+
+        func contentBounds(
+            pixelRows: [String],
+            isSolid: (Character) -> Bool
+        ) -> CGRect {
+            var minRow = pixelRows.count
+            var maxRow = 0
+            var minCol = cols
+            var maxCol = 0
+
+            for (rowIndex, row) in pixelRows.enumerated() {
+                for (colIndex, character) in row.enumerated() {
+                    guard isSolid(character) else { continue }
+                    minRow = min(minRow, rowIndex)
+                    maxRow = max(maxRow, rowIndex)
+                    minCol = min(minCol, colIndex)
+                    maxCol = max(maxCol, colIndex)
+                }
+            }
+
+            guard minRow <= maxRow, minCol <= maxCol else { return .zero }
+
+            return CGRect(
+                x: originX + CGFloat(minCol) * pixelSize,
+                y: originY + CGFloat(rows - maxRow - 1) * pixelSize,
+                width: CGFloat(maxCol - minCol + 1) * pixelSize,
+                height: CGFloat(maxRow - minRow + 1) * pixelSize
+            )
+        }
     }
 }
 
@@ -121,6 +150,14 @@ enum SceneRenderer {
 
     static func treeMetrics(in rect: CGRect) -> PixelArtRenderer.Metrics {
         PixelArtRenderer.metrics(rows: TreeArt.pixels, in: rect, anchor: .bottomLeading)
+    }
+
+    static func cloudMetrics(in rect: CGRect) -> PixelArtRenderer.Metrics {
+        PixelArtRenderer.metrics(rows: CloudArt.pixels, in: rect, anchor: .center)
+    }
+
+    static func solidScenePixel(_ character: Character) -> Bool {
+        ScenePalette(rawValue: character)?.color != nil
     }
 
     static func drawTree(in rect: CGRect, context: CGContext) {

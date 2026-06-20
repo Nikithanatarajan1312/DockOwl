@@ -1,6 +1,41 @@
 import AppKit
 
 enum OwlRenderer {
+    static func hitRect(at position: CGPoint, pose: OwlPose) -> CGRect {
+        let rows = OwlSprites.pixels(for: pose)
+        let grid = Constants.spriteSize
+
+        var minRow = grid
+        var maxRow = 0
+        var minCol = grid
+        var maxCol = 0
+
+        for (rowIndex, row) in rows.enumerated() {
+            for (columnIndex, character) in row.enumerated() {
+                guard character != ".", OwlPalette(rawValue: character)?.color != nil else { continue }
+                minRow = min(minRow, rowIndex)
+                maxRow = max(maxRow, rowIndex)
+                minCol = min(minCol, columnIndex)
+                maxCol = max(maxCol, columnIndex)
+            }
+        }
+
+        guard minRow <= maxRow, minCol <= maxCol else { return .zero }
+
+        let pixelWidth = Constants.owlSceneWidth / CGFloat(grid)
+        let pixelHeight = Constants.owlSceneHeight / CGFloat(grid)
+        let drawWidth = CGFloat(grid) * pixelWidth
+        let originX = position.x + (Constants.owlSceneWidth - drawWidth) / 2
+        let originY = position.y - CGFloat(grid - maxRow - 1) * pixelHeight
+
+        return CGRect(
+            x: originX + CGFloat(minCol) * pixelWidth,
+            y: originY + CGFloat(grid - maxRow - 1) * pixelHeight,
+            width: CGFloat(maxCol - minCol + 1) * pixelWidth,
+            height: CGFloat(maxRow - minRow + 1) * pixelHeight
+        )
+    }
+
     static func draw(pose: OwlPose, in context: CGContext, bounds: CGRect) {
         context.interpolationQuality = .none
         context.setShouldAntialias(false)

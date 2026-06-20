@@ -17,9 +17,25 @@ final class PetSceneView: NSView {
         didSet { needsDisplay = true }
     }
 
+    var roost: OwlRoost = .cloud {
+        didSet { needsDisplay = true }
+    }
+
+    var isFlying = false
+
     var onClick: ((CGPoint) -> Void)?
 
     override var isOpaque: Bool { false }
+
+    func acceptsClick(at point: NSPoint) -> Bool {
+        if isFlying { return false }
+
+        let layout = SceneLayout.layout(
+            in: bounds,
+            cloudCenterX: DockGeometry.cloudCenterX(for: window)
+        )
+        return layout.hitTarget(at: point, owlPosition: owlPosition, owlPose: pose, roost: roost) != .none
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }

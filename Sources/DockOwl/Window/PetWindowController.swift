@@ -12,6 +12,8 @@ final class PetWindowController: NSWindowController {
     private let behavior = OwlBehavior()
     private let flight = FlightAnimator()
     private var animationTimer: Timer?
+    private var mouseMoveMonitor: Any?
+    private var mouseDownMonitor: Any?
     private var focusPhase: FocusPhase = .idle
     private var roost: OwlRoost = .cloud
     private var owlPosition = CGPoint.zero
@@ -32,7 +34,7 @@ final class PetWindowController: NSWindowController {
         window.hasShadow = false
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        window.ignoresMouseEvents = false
+        window.ignoresMouseEvents = true
         window.isMovable = false
         super.init(window: window)
 
@@ -50,6 +52,7 @@ final class PetWindowController: NSWindowController {
         window.contentView = sceneView
 
         startAnimationLoop()
+        startMousePassthrough()
         observeScreenChanges()
         syncSceneView()
     }
@@ -61,6 +64,12 @@ final class PetWindowController: NSWindowController {
 
     deinit {
         animationTimer?.invalidate()
+        if let mouseMoveMonitor {
+            NSEvent.removeMonitor(mouseMoveMonitor)
+        }
+        if let mouseDownMonitor {
+            NSEvent.removeMonitor(mouseDownMonitor)
+        }
     }
 
     func update(focusPhase: FocusPhase, clockText: String, toolTip: String) {
@@ -99,6 +108,33 @@ final class PetWindowController: NSWindowController {
         beginFlight(to: .cloud)
     }
 
+    private func startMousePassthrough() {
+        mouseMoveMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] _ in
+            self?.updateMousePassthrough()
+        }
+        mouseDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            self?.updateMousePassthrough()
+            return event
+        }
+        updateMousePassthrough()
+    }
+
+    private func updateMousePassthrough() {
+        guard let window else { return }
+
+        let screenPoint = NSEvent.mouseLocation
+        guard window.frame.contains(screenPoint) else {
+            window.ignoresMouseEvents = true
+            return
+        }
+
+        let localPoint = CGPoint(
+            x: screenPoint.x - window.frame.minX,
+            y: screenPoint.y - window.frame.minY
+        )
+        window.ignoresMouseEvents = !sceneView.acceptsClick(at: localPoint)
+    }
+
     private func startAnimationLoop() {
         animationTimer = Timer.scheduledTimer(withTimeInterval: Constants.frameInterval, repeats: true) { [weak self] _ in
             self?.step()
@@ -119,6 +155,8 @@ final class PetWindowController: NSWindowController {
 
         sceneView.pose = behavior.pose
         sceneView.owlPosition = owlPosition
+        sceneView.isFlying = flight.isFlying
+        updateMousePassthrough()
         repositionIfNeeded()
     }
 
@@ -126,7 +164,7 @@ final class PetWindowController: NSWindowController {
         guard !flight.isFlying else { return }
 
         let layout = currentLayout()
-        let target = layout.hitTarget(at: point, owlPosition: owlPosition, roost: roost)
+        let target = layout.hitTarget(at: point, owlPosition: owlPosition, owlPose: behavior.pose, roost: roost)
 
         switch roost {
         case .cloud:
@@ -187,6 +225,8 @@ final class PetWindowController: NSWindowController {
         sceneView.clockText = clockText
         sceneView.clockActive = focusPhase == .focusing || focusPhase == .onBreak
         sceneView.pose = behavior.pose
+        sceneView.roost = roost
+        sceneView.isFlying = flight.isFlying
     }
 
     private func repositionIfNeeded() {

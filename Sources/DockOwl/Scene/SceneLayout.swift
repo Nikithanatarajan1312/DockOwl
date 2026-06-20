@@ -92,7 +92,9 @@ enum SceneLayout {
     struct Layout {
         let bounds: CGRect
         let cloud: CGRect
+        let cloudHitArea: CGRect
         let tree: CGRect
+        let treeHitArea: CGRect
         let treeLeaves: CGRect
         let clock: CGRect
         let cloudPerch: CGPoint
@@ -103,6 +105,7 @@ enum SceneLayout {
 
             tree = CGRect(x: 10, y: 8, width: 104, height: bounds.height - 12)
             let metrics = SceneRenderer.treeMetrics(in: tree)
+            treeHitArea = metrics.contentBounds(pixelRows: TreeArt.pixels, isSolid: SceneRenderer.solidScenePixel)
 
             let clockPixelRect = metrics.rectForSpriteRow(
                 TreeArt.clockRowFromTop,
@@ -137,6 +140,8 @@ enum SceneLayout {
                 width: cloudWidth,
                 height: 50
             )
+            let cloudMetrics = SceneRenderer.cloudMetrics(in: cloud)
+            cloudHitArea = cloudMetrics.contentBounds(pixelRows: CloudArt.pixels, isSolid: SceneRenderer.solidScenePixel)
             cloudPerch = CGPoint(
                 x: cloud.midX - Constants.owlSceneWidth / 2,
                 y: cloud.minY + 6
@@ -152,19 +157,23 @@ enum SceneLayout {
             )
         }
 
-        func hitTarget(at point: CGPoint, owlPosition: CGPoint, roost: OwlRoost) -> HitTarget {
-            let owl = owlRect(at: owlPosition)
-            if owl.contains(point) {
+        func hitTarget(
+            at point: CGPoint,
+            owlPosition: CGPoint,
+            owlPose: OwlPose,
+            roost: OwlRoost
+        ) -> HitTarget {
+            if OwlRenderer.hitRect(at: owlPosition, pose: owlPose).contains(point) {
                 return .owl
             }
 
             switch roost {
             case .cloud:
-                if cloud.contains(point) {
+                if cloudHitArea.contains(point) {
                     return .cloud
                 }
             case .tree:
-                if treeLeaves.contains(point) || tree.contains(point) {
+                if treeHitArea.contains(point) || clock.contains(point) {
                     return .tree
                 }
             }
